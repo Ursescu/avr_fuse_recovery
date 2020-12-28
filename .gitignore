@@ -1,0 +1,4 @@
+.vscode/
+bootloadHID/
+.dep/
+build/
