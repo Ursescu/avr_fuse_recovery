@@ -9,29 +9,32 @@
 #include <spi.h>
 #include <dbg.h>
 #include <timer.h>
-
-#define UART_BAUDRATE 38400
+#include <hvsp.h>
 
 int main(void) {
-    initMSTimer();
 
-    // Enable debug print
-    initDBG();
-
-    // Init SPI, mode 0 with clock div 128
-    initSPI(0, 3);
-
-    // Debug led output
-    DDRD |= _BV(PD7);
+    initHVSP();
 
     // Enable interrupts
     sei();
 
+    uint8_t byte1 = 0x00;
+    uint8_t byte2 = 0xFF;
     // Main loop
     while (1) {
-        PORTD ^= _BV(PD7);
-        printfDBG("Hello\n");
-        delay_ms(500);
+        sendBytesHVSP(byte1, byte2);
+
+        if (byte2 == 0x00) {
+            byte2 = 0xff;
+        } else {
+            byte2--;
+        }
+
+        if (byte1 == 0xff) {
+            byte1 = 0x00;
+        } else {
+            byte1++;
+        }
     }
 
     return 0;

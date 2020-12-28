@@ -69,6 +69,7 @@ SRC =	main.c \
 		buffer.c \
 		spi.c \
 		timer.c \
+		hvsp.c \
 		dbg/dbg.c \
 		dbg/serialdbg.c
 
