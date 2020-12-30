@@ -21,11 +21,11 @@
 
 #define SDI_PORT PORTD
 #define SDI_DDR DDRD
-#define SDI_PIN PD6
+#define SDI_PIN PD7
 
 #define SII_PORT PORTD
 #define SII_DDR DDRD
-#define SII_PIN PD7
+#define SII_PIN PD6
 
 #define SCI_PORT PORTB
 #define SCI_DDR DDRB
@@ -47,11 +47,14 @@
 #define VCC_DDR DDRB
 #define VCC_PIN PB5
 
-
+/* Init HVSP module */
 PUBLIC void initHVSP(void);
+
+/* Start the HVSP bootup sequence */ 
+PUBLIC void enterHVSPMode(void);
 
 /* Sending SDI and SII bytes to HVSP interface.
  * Not interrupt safe, not thread safe 
  */
-PUBLIC void sendBytesHVSP(uint8_t sdi, uint8_t sii);
+PUBLIC uint8_t sendBytesHVSP(uint8_t sii, uint8_t sdi);
 #endif

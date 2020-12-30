@@ -39,11 +39,19 @@ PRIVATE void setHighSDITimer(void) __attribute__((always_inline));
 PRIVATE void setLowSII(void) __attribute__((always_inline));
 PRIVATE void setHighSII(void) __attribute__((always_inline));
 PRIVATE void toggleSII(void) __attribute__((always_inline));
-PRIVATE void setLowSIITimer(void)  __attribute__((always_inline));
+PRIVATE void setLowSIITimer(void) __attribute__((always_inline));
 PRIVATE void setHighSIITimer(void) __attribute__((always_inline));
 
 PRIVATE void enableDataTimer(void) __attribute__((always_inline));
 PRIVATE void disableDataTimer(void) __attribute__((always_inline));
+
+PRIVATE void initVCCPin(void) __attribute__((always_inline));
+PRIVATE void enableVCCPin(void) __attribute__((always_inline));
+PRIVATE void disableVCCPin(void) __attribute__((always_inline));
+
+PRIVATE void disableHVPin(void) __attribute__((always_inline));
+PRIVATE void enableHVPin(void) __attribute__((always_inline));
+PRIVATE void initHVPin(void) __attribute__((always_inline));
 
 /* Transform least significat bit to most significat bit 8 bit variable */
 PRIVATE uint8_t lsbToMsb(uint8_t data);
@@ -80,25 +88,63 @@ PUBLIC void initHVSP(void) {
     SII_DDR |= _BV(SII_PIN);
     SCI_DDR |= _BV(SCI_PIN);
 
+    // Input - but need as output for entering programming mode
+    SDO_DDR |= _BV(SDO_PIN);
+
     // Set them on low
     setLowSCI();
     setLowSDI();
     setLowSII();
 
-    // Input
-    SDO_DDR &= ~(_BV(SDO_PIN));
+    SDO_PORT &= ~(_BV(SDO_PIN));
+
+    initHVPin();
+    disableHVPin();
+
+    initVCCPin();
+    disableVCCPin();
 }
 
-PUBLIC void sendBytesHVSP(uint8_t sdiByte, uint8_t siiByte) {
+PUBLIC void enterHVSPMode(void) {
+    // Set them on low
+    setLowSDI();
+    setLowSII();
+
+    // Configure SDO as output and set it low
+    SDO_DDR |= _BV(SDO_PIN);
+    SDO_PORT &= ~(_BV(SDO_PIN));
+
+    // Disable HV pin and VCC pin
+    disableHVPin();
+    disableVCCPin();
+
+    _delay_ms(20);
+
+    // Start the procedure
+
+    enableVCCPin();
+    _delay_us(20);
+    enableHVPin();
+    _delay_us(10);
+
+    // Release it as input
+    SDO_DDR &= ~(_BV(SDO_PIN));
+
+    _delay_us(300);
+}
+
+PUBLIC uint8_t sendBytesHVSP(uint8_t siiByte, uint8_t sdiByte) {
     sdi = lsbToMsb(sdiByte);
     sii = lsbToMsb(siiByte);
-
+    sdo = 0U;
     startTransaction();
 
     // Block here until the end
     while (state != IDLE) {
         ;
     }
+
+    return sdo;
 }
 
 /* Clock interrupt, both pos and negative edge */
@@ -109,6 +155,9 @@ ISR(TIMER0_COMPA_vect) {
             state = START_STAGE1;
 
             enableDataTimer();
+            
+            TCCR0A &= ~(_BV(COM0A1));
+            TCCR0A |= _BV(COM0A0);
 
             break;
         }
@@ -119,9 +168,13 @@ ISR(TIMER0_COMPA_vect) {
             break;
         }
         case TX: {
-            TCCR0A &= ~(_BV(COM0A1));
-            TCCR0A |= _BV(COM0A0);
-
+            // Reading bit from target only on falling edge
+            if ((shift > 5U) && (shift % 2 == 0U)) {
+                sdo |= !!(PINB & (_BV(SDO_PIN)));
+                if (shift > 7U) {
+                    sdo <<= 1;
+                }
+            }
             // Finished transmitting the byte
             if (!shift) {
                 state = FINISH;
@@ -209,7 +262,7 @@ PRIVATE void startTransaction(void) {
     OCR0A = PERIOD_CLOCK / 2U;
 
     // Counted on both pos neg edges of clock
-    shift = NUM_BITS(sdi) * 2U;
+    shift = NUM_BITS(sdi) * 2U + 4;
 
     // Prepare the first bits
     prepareNextSDIBit();
@@ -310,7 +363,6 @@ PRIVATE void enableHVPin(void) {
 
 PRIVATE void initHVPin(void) {
     HV_DDR |= _BV(HV_PIN);
-    disableHVPin();
 }
 /* End HV */
 
@@ -325,6 +377,5 @@ PRIVATE void enableVCCPin(void) {
 
 PRIVATE void initVCCPin(void) {
     VCC_DDR |= _BV(VCC_PIN);
-    disableVCCPin();
 }
 /* End VCC */
